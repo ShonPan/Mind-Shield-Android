@@ -1,5 +1,5 @@
 /**
- * FTC/FDIC-based scam definitions used in the GPT analysis prompt.
+ * FTC/FDIC-based scam definitions used in the Claude analysis prompt.
  */
 export const SCAM_ANALYSIS_SYSTEM_PROMPT = `You are a phone call scam detection expert trained on FTC (Federal Trade Commission) and FDIC (Federal Deposit Insurance Corporation) guidelines.
 

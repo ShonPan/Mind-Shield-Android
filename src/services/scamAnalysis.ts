@@ -20,8 +20,8 @@ export class ScamAnalysisError extends Error {
   }
 }
 
-/** Shape of the JSON payload returned by GPT inside its message content. */
-interface GptAnalysisPayload {
+/** Shape of the JSON payload returned by Claude inside its message content. */
+interface ClaudeAnalysisPayload {
   risk_score: number;
   scam_categories: string[];
   scam_tactics: string[];
@@ -30,19 +30,19 @@ interface GptAnalysisPayload {
 
 /** Weight given to the keyword pre-filter score (0-1). */
 const KEYWORD_WEIGHT = 0.3;
-/** Weight given to the GPT analysis score (0-1). */
-const GPT_WEIGHT = 0.7;
+/** Weight given to the Claude analysis score (0-1). */
+const CLAUDE_WEIGHT = 0.7;
 
 /**
  * Analyzes a phone-call transcript for scam indicators.
  *
  * The pipeline:
  *  1. Keyword pre-filter  -- fast, local regex scan.
- *  2. GPT-4o-mini analysis -- deeper semantic understanding.
- *  3. Score blending       -- 30 % keyword, 70 % GPT.
- *  4. Risk level mapping   -- green / yellow / red via thresholds.
+ *  2. Claude analysis     -- deeper semantic understanding.
+ *  3. Score blending      -- 30 % keyword, 70 % Claude.
+ *  4. Risk level mapping  -- green / yellow / red via thresholds.
  *
- * If the GPT call fails the function degrades gracefully to keyword-only results.
+ * If the Claude call fails the function degrades gracefully to keyword-only results.
  *
  * @param transcript - The full transcript text of the phone call.
  * @returns A {@link ScamAnalysisResult} with the combined risk assessment.
@@ -56,15 +56,15 @@ export async function analyzeTranscript(
   const keywordResult = runKeywordFilter(transcript);
 
   // -----------------------------------------------------------
-  // Step 2: Call OpenAI GPT-4o-mini
+  // Step 2: Call Anthropic Claude
   // -----------------------------------------------------------
-  let gptPayload: GptAnalysisPayload | null = null;
+  let claudePayload: ClaudeAnalysisPayload | null = null;
 
   try {
-    gptPayload = await callGptAnalysis(transcript);
+    claudePayload = await callClaudeAnalysis(transcript);
   } catch (error) {
     console.warn(
-      '[MindShield] GPT analysis failed, falling back to keyword-only results:',
+      '[MindShield] Claude analysis failed, falling back to keyword-only results:',
       error instanceof Error ? error.message : String(error),
     );
   }
@@ -72,26 +72,26 @@ export async function analyzeTranscript(
   // -----------------------------------------------------------
   // Step 3 & 4: Combine scores and determine risk level
   // -----------------------------------------------------------
-  if (gptPayload) {
+  if (claudePayload) {
     const combinedScore = Math.min(
       100,
       Math.round(
         keywordResult.preliminary_score * KEYWORD_WEIGHT +
-          gptPayload.risk_score * GPT_WEIGHT,
+          claudePayload.risk_score * CLAUDE_WEIGHT,
       ),
     );
 
-    // Merge categories: union of keyword and GPT categories.
+    // Merge categories: union of keyword and Claude categories.
     const mergedCategories = Array.from(
-      new Set([...keywordResult.categories, ...gptPayload.scam_categories]),
+      new Set([...keywordResult.categories, ...claudePayload.scam_categories]),
     );
 
     return {
       risk_score: combinedScore,
       risk_level: getRiskLevel(combinedScore),
       scam_categories: mergedCategories,
-      scam_tactics: gptPayload.scam_tactics,
-      summary: gptPayload.summary,
+      scam_tactics: claudePayload.scam_tactics,
+      summary: claudePayload.summary,
     };
   }
 
@@ -114,34 +114,34 @@ export async function analyzeTranscript(
 // ---------------------------------------------------------------
 
 /**
- * Sends the transcript to OpenAI GPT-4o-mini and returns the parsed
+ * Sends the transcript to Anthropic Claude and returns the parsed
  * analysis payload.
  */
-async function callGptAnalysis(transcript: string): Promise<GptAnalysisPayload> {
+async function callClaudeAnalysis(transcript: string): Promise<ClaudeAnalysisPayload> {
   const body = {
     model: ANALYSIS.MODEL,
     max_tokens: ANALYSIS.MAX_TOKENS,
     temperature: ANALYSIS.TEMPERATURE,
-    response_format: {type: 'json_object'},
+    system: SCAM_ANALYSIS_SYSTEM_PROMPT,
     messages: [
-      {role: 'system', content: SCAM_ANALYSIS_SYSTEM_PROMPT},
       {role: 'user', content: SCAM_ANALYSIS_USER_PROMPT(transcript)},
     ],
   };
 
   let response: Response;
   try {
-    response = await fetch(API_ENDPOINTS.OPENAI, {
+    response = await fetch(API_ENDPOINTS.ANTHROPIC, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${API_KEYS.OPENAI}`,
+        'x-api-key': API_KEYS.ANTHROPIC,
+        'anthropic-version': '2023-06-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new ScamAnalysisError(`Network error calling OpenAI: ${message}`);
+    throw new ScamAnalysisError(`Network error calling Anthropic: ${message}`);
   }
 
   if (!response.ok) {
@@ -153,27 +153,34 @@ async function callGptAnalysis(transcript: string): Promise<GptAnalysisPayload> 
       // Response body could not be parsed -- use statusText.
     }
     throw new ScamAnalysisError(
-      `OpenAI API error (HTTP ${response.status}): ${detail}`,
+      `Anthropic API error (HTTP ${response.status}): ${detail}`,
       response.status,
     );
   }
 
   const data = await response.json();
-  const content: string | undefined =
-    data?.choices?.[0]?.message?.content;
+  const content: string | undefined = data?.content?.[0]?.text;
 
   if (!content) {
     throw new ScamAnalysisError(
-      'OpenAI response did not contain message content',
+      'Anthropic response did not contain message content',
     );
   }
 
-  let parsed: GptAnalysisPayload;
+  // Extract JSON from the response (Claude may wrap it in markdown code blocks)
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new ScamAnalysisError(
+      'Failed to find JSON in Claude response',
+    );
+  }
+
+  let parsed: ClaudeAnalysisPayload;
   try {
-    parsed = JSON.parse(content) as GptAnalysisPayload;
+    parsed = JSON.parse(jsonMatch[0]) as ClaudeAnalysisPayload;
   } catch {
     throw new ScamAnalysisError(
-      'Failed to parse GPT response as JSON',
+      'Failed to parse Claude response as JSON',
     );
   }
 
@@ -185,7 +192,7 @@ async function callGptAnalysis(transcript: string): Promise<GptAnalysisPayload> 
     typeof parsed.summary !== 'string'
   ) {
     throw new ScamAnalysisError(
-      'GPT response JSON is missing required fields',
+      'Claude response JSON is missing required fields',
     );
   }
 

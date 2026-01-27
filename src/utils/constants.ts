@@ -1,14 +1,10 @@
+export {API_KEYS} from '../config/apiKeys';
+
 export const RECORDING_DIR = '/storage/emulated/0/Recordings/Call';
 
 export const API_ENDPOINTS = {
   DEEPGRAM: 'https://api.deepgram.com/v1/listen',
-  OPENAI: 'https://api.openai.com/v1/chat/completions',
-};
-
-// Replace with your actual API keys
-export const API_KEYS = {
-  DEEPGRAM: 'YOUR_DEEPGRAM_API_KEY',
-  OPENAI: 'YOUR_OPENAI_API_KEY',
+  ANTHROPIC: 'https://api.anthropic.com/v1/messages',
 };
 
 export const RISK_THRESHOLDS = {
@@ -37,7 +33,7 @@ export const TRANSCRIPTION = {
 };
 
 export const ANALYSIS = {
-  MODEL: 'gpt-4o-mini',
+  MODEL: 'claude-3-5-haiku-latest',
   MAX_TOKENS: 1024,
   TEMPERATURE: 0.2,
 };
