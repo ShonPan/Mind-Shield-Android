@@ -212,3 +212,111 @@ export async function getPendingCalls(): Promise<CallRecord[]> {
   );
   return extractRows(results).map(rowToCallRecord);
 }
+
+// ---------------------------------------------------------------------------
+// Flagged Numbers (Scam Database)
+// ---------------------------------------------------------------------------
+
+export interface FlaggedNumber {
+  phone_number: string;
+  times_flagged: number;
+  highest_risk_score: number;
+  categories: string[];
+  first_flagged_at: string;
+  last_flagged_at: string;
+}
+
+function rowToFlaggedNumber(row: Record<string, unknown>): FlaggedNumber {
+  return {
+    phone_number: row.phone_number as string,
+    times_flagged: Number(row.times_flagged),
+    highest_risk_score: Number(row.highest_risk_score),
+    categories: row.categories
+      ? (JSON.parse(row.categories as string) as string[])
+      : [],
+    first_flagged_at: row.first_flagged_at as string,
+    last_flagged_at: row.last_flagged_at as string,
+  };
+}
+
+/**
+ * Check if a phone number is already flagged as a scam.
+ */
+export async function getFlaggedNumber(
+  phoneNumber: string,
+): Promise<FlaggedNumber | null> {
+  const db = await getDatabase();
+  const results = await db.executeSql(
+    'SELECT * FROM flagged_numbers WHERE phone_number = ? LIMIT 1;',
+    [phoneNumber],
+  );
+  const rows = extractRows(results);
+  return rows.length > 0 ? rowToFlaggedNumber(rows[0]) : null;
+}
+
+/**
+ * Flag a phone number as a scam or update existing flag.
+ */
+export async function flagNumber(
+  phoneNumber: string,
+  riskScore: number,
+  categories: string[],
+): Promise<void> {
+  const db = await getDatabase();
+  const now = nowISO();
+
+  const existing = await getFlaggedNumber(phoneNumber);
+
+  if (existing) {
+    // Update existing record
+    const mergedCategories = Array.from(
+      new Set([...existing.categories, ...categories]),
+    );
+    const newHighestScore = Math.max(existing.highest_risk_score, riskScore);
+
+    await db.executeSql(
+      `UPDATE flagged_numbers
+          SET times_flagged = times_flagged + 1,
+              highest_risk_score = ?,
+              categories = ?,
+              last_flagged_at = ?
+        WHERE phone_number = ?;`,
+      [newHighestScore, JSON.stringify(mergedCategories), now, phoneNumber],
+    );
+  } else {
+    // Insert new record
+    await db.executeSql(
+      `INSERT INTO flagged_numbers (
+        phone_number,
+        times_flagged,
+        highest_risk_score,
+        categories,
+        first_flagged_at,
+        last_flagged_at
+      ) VALUES (?, 1, ?, ?, ?, ?);`,
+      [phoneNumber, riskScore, JSON.stringify(categories), now, now],
+    );
+  }
+}
+
+/**
+ * Get all flagged numbers, sorted by highest risk score.
+ */
+export async function getAllFlaggedNumbers(): Promise<FlaggedNumber[]> {
+  const db = await getDatabase();
+  const results = await db.executeSql(
+    'SELECT * FROM flagged_numbers ORDER BY highest_risk_score DESC;',
+  );
+  return extractRows(results).map(rowToFlaggedNumber);
+}
+
+/**
+ * Remove a number from the flagged list (e.g., if user marks as safe).
+ */
+export async function unflagNumber(phoneNumber: string): Promise<void> {
+  const db = await getDatabase();
+  await db.executeSql(
+    'DELETE FROM flagged_numbers WHERE phone_number = ?;',
+    [phoneNumber],
+  );
+}

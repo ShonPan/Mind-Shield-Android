@@ -55,3 +55,38 @@ export async function sendScamAlert(
     },
   });
 }
+
+/**
+ * Displays an immediate alert when a call is detected from a
+ * phone number that has been previously flagged as a scam.
+ */
+export async function sendKnownScammerAlert(
+  phoneNumber: string,
+  timesFlagged: number,
+  highestRiskScore: number,
+): Promise<void> {
+  const body =
+    timesFlagged === 1
+      ? `This number was previously flagged as a scam (risk score: ${highestRiskScore}).`
+      : `This number has been flagged ${timesFlagged} times as a scam (highest risk: ${highestRiskScore}).`;
+
+  await notifee.displayNotification({
+    title: '\u{1F6A8} Known Scammer: ' + phoneNumber,
+    body,
+    data: {
+      phoneNumber,
+      timesFlagged: String(timesFlagged),
+    },
+    android: {
+      channelId: NOTIFICATION_CHANNEL.ID,
+      color: AndroidColor.RED,
+      importance: AndroidImportance.HIGH,
+      autoCancel: true,
+      pressAction: {
+        id: 'view-flagged',
+        launchActivity: 'default',
+      },
+      smallIcon: 'ic_launcher',
+    },
+  });
+}

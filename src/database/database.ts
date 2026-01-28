@@ -42,4 +42,16 @@ export async function initDatabase(): Promise<void> {
       updated_at TEXT NOT NULL
     );
   `);
+
+  // Flagged scam numbers database
+  await db.executeSql(`
+    CREATE TABLE IF NOT EXISTS flagged_numbers (
+      phone_number TEXT PRIMARY KEY,
+      times_flagged INTEGER NOT NULL DEFAULT 1,
+      highest_risk_score INTEGER NOT NULL,
+      categories TEXT,
+      first_flagged_at TEXT NOT NULL,
+      last_flagged_at TEXT NOT NULL
+    );
+  `);
 }

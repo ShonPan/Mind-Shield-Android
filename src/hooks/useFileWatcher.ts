@@ -2,16 +2,26 @@ import {useState, useCallback, useRef} from 'react';
 import {FileWatcher} from '../services/fileWatcherBridge';
 import {transcribeAudio} from '../services/transcription';
 import {analyzeTranscript} from '../services/scamAnalysis';
-import {sendScamAlert} from '../services/notificationService';
+import {sendScamAlert, sendKnownScammerAlert} from '../services/notificationService';
 import {
   insertCallRecord,
   updateTranscription,
   updateAnalysis,
   getCallRecordByFilePath,
+  getFlaggedNumber,
+  flagNumber,
 } from '../database/callRecordRepository';
-import {getRiskLevel} from '../utils/riskLevel';
 import {useCallRecords} from './useCallRecords';
 import uuid from 'react-native-uuid';
+
+/**
+ * Extract phone number from Samsung call recording filename.
+ * Format: Call_555-0178_20260127_135555.m4a
+ */
+function extractPhoneNumber(fileName: string): string | null {
+  const match = fileName.match(/^Call_([^_]+)_\d{8}_\d{6}\.m4a$/);
+  return match ? match[1] : null;
+}
 
 export function useFileWatcher() {
   const [isWatching, setIsWatching] = useState(false);
@@ -22,6 +32,7 @@ export function useFileWatcher() {
     async (filePath: string, fileName: string) => {
       const id = uuid.v4() as string;
       const now = new Date().toISOString();
+      const phoneNumber = extractPhoneNumber(fileName);
 
       try {
         // Check if already processed
@@ -31,13 +42,26 @@ export function useFileWatcher() {
           return;
         }
 
+        // Check if this is a known scammer
+        if (phoneNumber) {
+          const flaggedInfo = await getFlaggedNumber(phoneNumber);
+          if (flaggedInfo) {
+            console.log('Known scammer detected:', phoneNumber);
+            await sendKnownScammerAlert(
+              phoneNumber,
+              flaggedInfo.times_flagged,
+              flaggedInfo.highest_risk_score,
+            );
+          }
+        }
+
         // Step 1: Create pending record
         await insertCallRecord({
           id,
           file_path: filePath,
           file_name: fileName,
           detected_at: now,
-          phone_number: null,
+          phone_number: phoneNumber,
           duration_sec: null,
           transcript: null,
           transcription_status: 'pending',
@@ -75,6 +99,16 @@ export function useFileWatcher() {
         // Step 4: Notify if high risk
         if (analysis.risk_score >= 70) {
           await sendScamAlert(id, analysis.summary, analysis.risk_score);
+
+          // Auto-flag this number in the scam database
+          if (phoneNumber) {
+            await flagNumber(
+              phoneNumber,
+              analysis.risk_score,
+              analysis.scam_categories,
+            );
+            console.log('Flagged scam number:', phoneNumber);
+          }
         }
       } catch (error) {
         console.error('Error processing file:', filePath, error);
