@@ -1,4 +1,4 @@
-import React, {useEffect, useCallback} from 'react';
+import React, {useEffect, useCallback, useState, useMemo} from 'react';
 import {View, Text, StyleSheet, FlatList, TouchableOpacity} from 'react-native';
 import {useAppContext} from '../context/AppContext';
 import {useCallRecords} from '../hooks/useCallRecords';
@@ -39,8 +39,18 @@ export function HomeScreen({navigation}: HomeScreenProps) {
     });
   }, [navigation]);
 
+  const [filterSuspicious, setFilterSuspicious] = useState(false);
+
   const highRiskCalls = records.filter(
     r => r.risk_level === 'red' && !r.user_dismissed,
+  );
+
+  const displayedRecords = useMemo(
+    () =>
+      filterSuspicious
+        ? records.filter(r => r.risk_level === 'red' || r.risk_level === 'yellow')
+        : records,
+    [records, filterSuspicious],
   );
 
   const handleCallPress = useCallback(
@@ -76,13 +86,13 @@ export function HomeScreen({navigation}: HomeScreenProps) {
       {/* High Risk Alert */}
       {highRiskCalls.length > 0 && (
         <AlertBanner
-          message={`${highRiskCalls.length} suspicious call${highRiskCalls.length > 1 ? 's' : ''} detected! Tap to review.`}
+          message={
+            filterSuspicious
+              ? `Showing ${displayedRecords.length} suspicious call${displayedRecords.length !== 1 ? 's' : ''}. Tap to show all.`
+              : `${highRiskCalls.length} suspicious call${highRiskCalls.length > 1 ? 's' : ''} detected! Tap to filter.`
+          }
           type="danger"
-          onDismiss={() => {
-            if (highRiskCalls[0]) {
-              navigation.navigate('CallDetail', {callId: highRiskCalls[0].id});
-            }
-          }}
+          onPress={() => setFilterSuspicious(prev => !prev)}
         />
       )}
 
@@ -97,7 +107,7 @@ export function HomeScreen({navigation}: HomeScreenProps) {
         />
       ) : (
         <FlatList
-          data={records}
+          data={displayedRecords}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.list}

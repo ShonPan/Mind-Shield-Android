@@ -51,7 +51,7 @@ export async function sendScamAlert(
         id: 'view-call',
         launchActivity: 'default',
       },
-      smallIcon: 'ic_notification',
+      smallIcon: 'ic_launcher',
     },
   });
 }

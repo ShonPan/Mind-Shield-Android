@@ -7,6 +7,7 @@ type AlertType = 'danger' | 'warning' | 'info';
 interface AlertBannerProps {
   message: string;
   type: AlertType;
+  onPress?: () => void;
   onDismiss?: () => void;
 }
 
@@ -33,19 +34,11 @@ function getAlertColors(type: AlertType): {background: string; text: string; bor
   }
 }
 
-const AlertBanner: React.FC<AlertBannerProps> = ({message, type, onDismiss}) => {
+const AlertBanner: React.FC<AlertBannerProps> = ({message, type, onPress, onDismiss}) => {
   const alertColors = getAlertColors(type);
 
-  return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: alertColors.background,
-          borderColor: alertColors.border,
-        },
-      ]}
-      accessibilityRole="alert">
+  const content = (
+    <>
       <Text style={[styles.message, {color: alertColors.text}]}>
         {message}
       </Text>
@@ -61,6 +54,38 @@ const AlertBanner: React.FC<AlertBannerProps> = ({message, type, onDismiss}) => 
           </Text>
         </TouchableOpacity>
       )}
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        onPress={onPress}
+        style={[
+          styles.container,
+          {
+            backgroundColor: alertColors.background,
+            borderColor: alertColors.border,
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel="Filter suspicious calls">
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: alertColors.background,
+          borderColor: alertColors.border,
+        },
+      ]}
+      accessibilityRole="alert">
+      {content}
     </View>
   );
 };
