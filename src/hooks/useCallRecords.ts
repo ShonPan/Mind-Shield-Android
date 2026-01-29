@@ -4,6 +4,8 @@ import {
   getAllCallRecords,
   getCallRecordById,
   insertCallRecord,
+  deleteAllCallRecords,
+  deleteAllFlaggedNumbers,
 } from '../database/callRecordRepository';
 import type {CallRecord} from '../types/CallRecord';
 
@@ -48,11 +50,23 @@ export function useCallRecords() {
     [dispatch],
   );
 
+  const clearAllRecords = useCallback(async () => {
+    try {
+      await deleteAllCallRecords();
+      await deleteAllFlaggedNumbers();
+      dispatch({type: 'CLEAR_RECORDS'});
+    } catch (error) {
+      console.error('Failed to clear call records:', error);
+      throw error;
+    }
+  }, [dispatch]);
+
   return {
     records: state.callRecords,
     isLoading: state.isLoading,
     loadRecords,
     addRecord,
     refreshRecord,
+    clearAllRecords,
   };
 }

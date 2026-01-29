@@ -320,3 +320,19 @@ export async function unflagNumber(phoneNumber: string): Promise<void> {
     [phoneNumber],
   );
 }
+
+/**
+ * Delete all call records from the database.
+ */
+export async function deleteAllCallRecords(): Promise<void> {
+  const db = await getDatabase();
+  await db.executeSql('DELETE FROM call_records;');
+}
+
+/**
+ * Delete all flagged numbers from the database.
+ */
+export async function deleteAllFlaggedNumbers(): Promise<void> {
+  const db = await getDatabase();
+  await db.executeSql('DELETE FROM flagged_numbers;');
+}

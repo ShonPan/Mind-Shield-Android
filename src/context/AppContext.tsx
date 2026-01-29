@@ -25,6 +25,7 @@ type AppAction =
   | {type: 'SET_RECORDS'; payload: CallRecord[]}
   | {type: 'ADD_RECORD'; payload: CallRecord}
   | {type: 'UPDATE_RECORD'; payload: CallRecord}
+  | {type: 'CLEAR_RECORDS'}
   | {type: 'SET_MONITORING'; payload: boolean}
   | {type: 'SET_LOADING'; payload: boolean}
   | {type: 'SET_ONBOARDING'; payload: boolean};
@@ -47,6 +48,9 @@ function appReducer(state: AppState, action: AppAction): AppState {
           r.id === action.payload.id ? action.payload : r,
         ),
       };
+
+    case 'CLEAR_RECORDS':
+      return {...state, callRecords: []};
 
     case 'SET_MONITORING':
       return {...state, isMonitoring: action.payload};

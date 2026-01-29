@@ -5,6 +5,7 @@ export type RootStackParamList = {
   Home: undefined;
   CallDetail: {callId: string};
   Settings: undefined;
+  ScamDatabase: undefined;
 };
 
 export type OnboardingScreenProps = NativeStackScreenProps<
@@ -22,4 +23,8 @@ export type CallDetailScreenProps = NativeStackScreenProps<
 export type SettingsScreenProps = NativeStackScreenProps<
   RootStackParamList,
   'Settings'
+>;
+export type ScamDatabaseScreenProps = NativeStackScreenProps<
+  RootStackParamList,
+  'ScamDatabase'
 >;

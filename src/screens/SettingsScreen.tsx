@@ -5,14 +5,17 @@ import {useFileWatcher} from '../hooks/useFileWatcher';
 import {useCallRecords} from '../hooks/useCallRecords';
 import BigButton from '../components/BigButton';
 import {RECORDING_DIR} from '../utils/constants';
+import {seedTestData} from '../utils/seedTestData';
 import type {SettingsScreenProps} from '../types/Navigation';
 import {colors, fonts, spacing, borderRadius} from '../styles/theme';
 
-export function SettingsScreen({}: SettingsScreenProps) {
+export function SettingsScreen({navigation}: SettingsScreenProps) {
   const {isWatching, startMonitoring, stopMonitoring, processFile} =
     useFileWatcher();
-  const {loadRecords} = useCallRecords();
+  const {loadRecords, clearAllRecords} = useCallRecords();
   const [scanning, setScanning] = useState(false);
+  const [wiping, setWiping] = useState(false);
+  const [seeding, setSeeding] = useState(false);
   const [monitoringEnabled, setMonitoringEnabled] = useState(isWatching);
 
   useEffect(() => {
@@ -76,6 +79,46 @@ export function SettingsScreen({}: SettingsScreenProps) {
     }
   };
 
+  const handleSeedTestData = async () => {
+    try {
+      setSeeding(true);
+      const count = await seedTestData();
+      await loadRecords();
+      Alert.alert('Done', `Added ${count} test call records (2 scams, 2 normal).`);
+    } catch (error) {
+      console.error('Seed failed:', error);
+      Alert.alert('Error', 'Failed to seed test data.');
+    } finally {
+      setSeeding(false);
+    }
+  };
+
+  const handleWipeRecordings = () => {
+    Alert.alert(
+      'Wipe All Recordings',
+      'This will permanently delete all call record data from the app. The actual audio files will not be deleted. Continue?',
+      [
+        {text: 'Cancel', style: 'cancel'},
+        {
+          text: 'Wipe All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setWiping(true);
+              await clearAllRecords();
+              Alert.alert('Done', 'All recording data has been wiped.');
+            } catch (error) {
+              console.error('Wipe failed:', error);
+              Alert.alert('Error', 'Failed to wipe recordings.');
+            } finally {
+              setWiping(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Monitoring Toggle */}
@@ -105,6 +148,21 @@ export function SettingsScreen({}: SettingsScreenProps) {
         </Text>
       </View>
 
+      {/* Scam Database */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Scam Database</Text>
+        <Text style={styles.sublabel}>
+          View flagged phone numbers reported as scams. Your reports help protect other users.
+        </Text>
+        <View style={styles.buttonContainer}>
+          <BigButton
+            title="View Scam Database"
+            onPress={() => navigation.navigate('ScamDatabase')}
+            variant="secondary"
+          />
+        </View>
+      </View>
+
       {/* Scan All */}
       <View style={styles.card}>
         <Text style={styles.label}>Bulk Scan</Text>
@@ -117,6 +175,38 @@ export function SettingsScreen({}: SettingsScreenProps) {
             onPress={handleScanAll}
             variant="primary"
             loading={scanning}
+          />
+        </View>
+      </View>
+
+      {/* Wipe Recordings */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Reset Data</Text>
+        <Text style={styles.sublabel}>
+          Delete all call record data from the app (audio files are kept)
+        </Text>
+        <View style={styles.buttonContainer}>
+          <BigButton
+            title="Wipe All Recordings"
+            onPress={handleWipeRecordings}
+            variant="danger"
+            loading={wiping}
+          />
+        </View>
+      </View>
+
+      {/* Dev Tools */}
+      <View style={styles.card}>
+        <Text style={styles.label}>Developer Tools</Text>
+        <Text style={styles.sublabel}>
+          Load sample call data for testing (2 scam calls, 2 normal calls)
+        </Text>
+        <View style={styles.buttonContainer}>
+          <BigButton
+            title="Load Test Data"
+            onPress={handleSeedTestData}
+            variant="secondary"
+            loading={seeding}
           />
         </View>
       </View>

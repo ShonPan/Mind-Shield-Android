@@ -5,6 +5,7 @@ import {useAppContext} from '../context/AppContext';
 import {HomeScreen} from '../screens/HomeScreen';
 import {CallDetailScreen} from '../screens/CallDetailScreen';
 import {SettingsScreen} from '../screens/SettingsScreen';
+import {ScamDatabaseScreen} from '../screens/ScamDatabaseScreen';
 import {OnboardingScreen} from '../screens/OnboardingScreen';
 import type {RootStackParamList} from '../types/Navigation';
 import {colors, fonts} from '../styles/theme';
@@ -49,6 +50,11 @@ export function AppNavigator() {
               name="Settings"
               component={SettingsScreen}
               options={{title: 'Settings'}}
+            />
+            <Stack.Screen
+              name="ScamDatabase"
+              component={ScamDatabaseScreen}
+              options={{title: 'Scam Database'}}
             />
           </>
         )}

@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {View, Text, StyleSheet, ScrollView} from 'react-native';
+import {View, Text, StyleSheet, ScrollView, Modal, TouchableOpacity} from 'react-native';
 import {getCallRecordById, dismissCall} from '../database/callRecordRepository';
 import RiskScoreBar from '../components/RiskScoreBar';
 import TranscriptView from '../components/TranscriptView';
@@ -10,10 +10,55 @@ import type {CallDetailScreenProps} from '../types/Navigation';
 import type {CallRecord} from '../types/CallRecord';
 import {colors, fonts, spacing, borderRadius} from '../styles/theme';
 
+const TROLL_RESPONSES = [
+  {
+    id: 'cartoon',
+    title: 'Cartoon Voice',
+    icon: '🎭',
+    description: 'Respond in a high-pitched cartoon character voice',
+    script:
+      '"Oh BOY oh BOY! Is this really the IRS? I\'ve always wanted to talk to you guys! Can you hold on? I need to find my SPECIAL calculator... *makes silly noises* ...it\'s shaped like a duck!"',
+  },
+  {
+    id: 'stutter',
+    title: 'Slow Stutter',
+    icon: '🐢',
+    description: 'Speak very slowly with frequent pauses',
+    script:
+      '"H-h-hello? Yes... I... um... can you... wait, what was... the question? Oh the... the money? Let me... think... about... *long pause* ...what were we talking about again?"',
+  },
+  {
+    id: 'prize',
+    title: "You've Won a Prize",
+    icon: '🎉',
+    description: 'Turn the tables - tell them THEY won something',
+    script:
+      '"CONGRATULATIONS! You\'re actually our 1 millionth caller! YOU\'VE won a free cruise to the Bahamas! I just need YOUR social security number and credit card to process your prize. This is totally legitimate, I promise!"',
+  },
+  {
+    id: 'grandma',
+    title: 'Confused Grandma',
+    icon: '👵',
+    description: 'Pretend to be a confused elderly person',
+    script:
+      '"Is this my grandson? Bobby? No wait, Tommy? Oh the IRS? Is that the new pharmacy? I need to refill my prescription for my... what\'s it called... the blue pills. Can you help me find my cat? His name is Mr. Whiskers..."',
+  },
+  {
+    id: 'hold',
+    title: 'Endless Hold',
+    icon: '⏳',
+    description: 'Keep putting them on hold',
+    script:
+      '"Oh absolutely, let me get that information for you. Can you hold for just one moment?" *wait 2 minutes* "Sorry about that! Now what did you need? Oh right, hold please..." *repeat indefinitely*',
+  },
+];
+
 export function CallDetailScreen({route, navigation}: CallDetailScreenProps) {
   const {callId} = route.params;
   const [record, setRecord] = useState<CallRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [trollModalVisible, setTrollModalVisible] = useState(false);
+  const [selectedTroll, setSelectedTroll] = useState<typeof TROLL_RESPONSES[0] | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -61,6 +106,15 @@ export function CallDetailScreen({route, navigation}: CallDetailScreenProps) {
   const handleDismiss = async () => {
     await dismissCall(record.id);
     setRecord({...record, user_dismissed: true});
+  };
+
+  const handleSelectTroll = (troll: typeof TROLL_RESPONSES[0]) => {
+    setSelectedTroll(troll);
+  };
+
+  const handleCloseTrollModal = () => {
+    setTrollModalVisible(false);
+    setSelectedTroll(null);
   };
 
   return (
@@ -125,8 +179,87 @@ export function CallDetailScreen({route, navigation}: CallDetailScreenProps) {
           ]}>
           <Text style={styles.cardTitle}>What to Do</Text>
           <Text style={styles.guidanceText}>{getGuidance()}</Text>
+          {record.risk_level === 'red' && (
+            <View style={styles.trollButtonContainer}>
+              <BigButton
+                title="Fight Back - Troll Responses"
+                onPress={() => setTrollModalVisible(true)}
+                variant="primary"
+              />
+            </View>
+          )}
         </View>
       )}
+
+      {/* Troll Response Modal */}
+      <Modal
+        visible={trollModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={handleCloseTrollModal}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {selectedTroll ? selectedTroll.title : 'Troll Responses'}
+              </Text>
+              <TouchableOpacity
+                onPress={handleCloseTrollModal}
+                style={styles.closeButton}>
+                <Text style={styles.closeButtonText}>X</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!selectedTroll ? (
+              <>
+                <Text style={styles.modalSubtitle}>
+                  Waste their time instead of yours. Select a response style:
+                </Text>
+                <ScrollView style={styles.trollList}>
+                  {TROLL_RESPONSES.map(troll => (
+                    <TouchableOpacity
+                      key={troll.id}
+                      style={styles.trollOption}
+                      onPress={() => handleSelectTroll(troll)}>
+                      <Text style={styles.trollIcon}>{troll.icon}</Text>
+                      <View style={styles.trollInfo}>
+                        <Text style={styles.trollTitle}>{troll.title}</Text>
+                        <Text style={styles.trollDescription}>
+                          {troll.description}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            ) : (
+              <View style={styles.scriptContainer}>
+                <Text style={styles.scriptIcon}>{selectedTroll.icon}</Text>
+                <Text style={styles.scriptDescription}>
+                  {selectedTroll.description}
+                </Text>
+                <View style={styles.scriptBox}>
+                  <Text style={styles.scriptLabel}>Sample Script:</Text>
+                  <Text style={styles.scriptText}>{selectedTroll.script}</Text>
+                </View>
+                <View style={styles.scriptActions}>
+                  <TouchableOpacity
+                    style={styles.backButton}
+                    onPress={() => setSelectedTroll(null)}>
+                    <Text style={styles.backButtonText}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.useButton}>
+                    <Text style={styles.useButtonText}>Auto-Respond</Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.comingSoon}>
+                  Auto-respond feature coming soon!
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Scam Categories */}
       {record.scam_categories && record.scam_categories.length > 0 && (
@@ -354,5 +487,150 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: spacing.xxl,
+  },
+  trollButtonContainer: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.alertBorder,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: borderRadius.lg,
+    borderTopRightRadius: borderRadius.lg,
+    maxHeight: '85%',
+    paddingBottom: spacing.xl,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.divider,
+  },
+  modalTitle: {
+    fontSize: fonts.sizeHeader,
+    fontWeight: fonts.weightBold,
+    color: colors.textPrimary,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: fonts.sizeLarge,
+    fontWeight: fonts.weightBold,
+    color: colors.textSecondary,
+  },
+  modalSubtitle: {
+    fontSize: fonts.sizeBody,
+    color: colors.textSecondary,
+    padding: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  trollList: {
+    paddingHorizontal: spacing.md,
+  },
+  trollOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  trollIcon: {
+    fontSize: 32,
+    marginRight: spacing.md,
+  },
+  trollInfo: {
+    flex: 1,
+  },
+  trollTitle: {
+    fontSize: fonts.sizeLarge,
+    fontWeight: fonts.weightBold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  trollDescription: {
+    fontSize: fonts.sizeSmall,
+    color: colors.textSecondary,
+  },
+  scriptContainer: {
+    padding: spacing.md,
+    alignItems: 'center',
+  },
+  scriptIcon: {
+    fontSize: 64,
+    marginBottom: spacing.md,
+  },
+  scriptDescription: {
+    fontSize: fonts.sizeBody,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  scriptBox: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    width: '100%',
+  },
+  scriptLabel: {
+    fontSize: fonts.sizeSmall,
+    fontWeight: fonts.weightBold,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  scriptText: {
+    fontSize: fonts.sizeBody,
+    color: colors.textPrimary,
+    fontStyle: 'italic',
+    lineHeight: 26,
+  },
+  scriptActions: {
+    flexDirection: 'row',
+    marginTop: spacing.lg,
+    gap: spacing.md,
+  },
+  backButton: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    fontSize: fonts.sizeBody,
+    fontWeight: fonts.weightMedium,
+    color: colors.textPrimary,
+  },
+  useButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  useButtonText: {
+    fontSize: fonts.sizeBody,
+    fontWeight: fonts.weightBold,
+    color: colors.textOnDark,
+  },
+  comingSoon: {
+    fontSize: fonts.sizeSmall,
+    color: colors.textMuted,
+    marginTop: spacing.md,
+    fontStyle: 'italic',
   },
 });
